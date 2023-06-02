@@ -28,6 +28,44 @@ The Yugioh Guessing Game is a multiplayer game where players have to guess the n
 - [Github Repository](http://xyz.com) (when applicable)
 - [Demo Video](http://xyz.com) (when applicable)
 
+## File Structure
+
+The project follows the following file structure (**updated**):
+
+├── .github
+│ ├── workflows
+│ │ └── node.yml
+├── driver
+│ ├── handler.js
+│ ├── index.js
+│ └── driver-handler.test.js
+├── vendor
+│ ├── handler.js
+│ ├── index.js
+│ └── vendor-handler.test.js
+├── .eslintrc.json
+├── .gitignore
+├── eventPool.js
+├── hub.js (**updated**)
+├── server.js (**added**)
+├── package.json
+└── README.md
+
+- `.github/workflows/node.yml`: GitHub Actions workflow configuration for Node.js.
+- `driver/handler.js`: Module for managing driver events.
+- `driver/index.js`: Entry point for the driver client application.
+- `driver/driver-handler.test.js`: Unit tests for the driver event handler.
+- `vendor/handler.js`: Module for managing vendor events.
+- `vendor/index.js`: Entry point for the vendor client application.
+- `vendor/vendor-handler.test.js`: Unit tests for the vendor event handler.
+- `.eslintrc.json`: ESLint configuration file.
+- `.gitignore`: Specifies intentionally untracked files to ignore.
+- `eventPool.js`: Module for the Global Event Pool.
+- `hub.js`: Module for managing global package events and communication via Socket.IO (**updated**).
+- `server.js`: Server entry point for the CAPS system, implementing Socket.IO (**added**).
+- `package.json`: Project configuration file.
+- `README.md`: This file.
+
 ## Collaborators
 
 - [Your Name]
