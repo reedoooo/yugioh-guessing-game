@@ -1,13 +1,14 @@
 {
-  "name": "caps",
+  "name": "yugioh-guessing-game",
   "version": "1.0.0",
-  "main": "eventPool.js",
+  "main": "hub.js",
   "description": "CAPS - The Code Academy Parcel Service",
   "license": "MIT",
   "keywords": [],
   "author": "Reed",
   "scripts": {
-    "test": "jest --verbose --coverage --detectOpenHandles --collectCoverageFrom='**/*.js' --coverageReporters='json' --coverageReporters='text' --coverageReporters='lcov' --coverageReporters='clover' --coverageReporters='html'"
+    "test": "jest --verbose --coverage --detectOpenHandles --collectCoverageFrom='**/*.js' --coverageReporters='json' --coverageReporters='text' --coverageReporters='lcov' --coverageReporters='clover' --coverageReporters='html'",
+    "start": "node hub.js"
   },
   "dependencies": {
     "chance": "^1.1.11",
