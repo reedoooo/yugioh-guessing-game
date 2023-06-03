@@ -9,9 +9,11 @@ const eventPool = {
   UPDATE_PLAYER: 'updatePlayer',
   PLAYER_GUESS: 'playerGuess',
   PLAYER_SCORE: 'playerScore',
-  NEW_CARD: 'newCard',
   PLAYER_TURN: 'playerTurn',
+  GAME_OVER: 'gameOver',
+  PLAYER_LEAVE: 'playerLeave',
 };
+
 
 module.exports = {
   eventPool,
