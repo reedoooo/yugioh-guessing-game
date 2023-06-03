@@ -2,6 +2,7 @@
 
 require('dotenv').config();
 const colors = require('colors');
+
 const { Server } = require('socket.io');
 const PlayerQueue = require('./lib/playerqueue');
 const { eventPool } = require('./eventPool');
@@ -185,4 +186,4 @@ io.on('connection', socket => {
 });
 
 // Print a message indicating that the server is running
-console.log('Server is running...');
+console.log(`Server is running... on ${process.env.PORT}`);

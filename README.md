@@ -4,7 +4,7 @@
 
 ### Author: [Your Name]
 
-![Yugioh Guessing Game](yugioh-guessing-game-screenshot.png)
+![Yugioh Guessing Game](./YuGiOh%20Guessing%20Game.jpeg)
 
 ## Table of Contents
 
