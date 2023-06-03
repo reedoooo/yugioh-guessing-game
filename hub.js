@@ -1,20 +1,21 @@
 'use strict';
 
-// Load environment variables from .env file
 require('dotenv').config();
-
-// Import chalk for styling console output
-const chalk = require('chalk');
-
-// Import necessary modules
+const colors = require('colors');
 const { Server } = require('socket.io');
-const io = new Server(process.env.PORT);
 const PlayerQueue = require('./lib/playerqueue');
-const eventPool = require('./eventPool');
+const { eventPool } = require('./eventPool');
 
-// Create a player queue and word pool for the game
-let playerQueue = new PlayerQueue();
-let wordPool = [
+const io = new Server(parseInt(process.env.PORT), {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+  },
+});
+
+const playerQueue = new PlayerQueue();
+
+const wordPool = [
   'dark magician',
   'blue eyes',
   'buster blader',
@@ -27,98 +28,107 @@ let wordPool = [
   'winged kuriboh',
 ];
 
-// Randomly select a secret word from the word pool
-let secretWord = wordPool[Math.round(Math.random() * (wordPool.length - 1))];
-
-// Create an array to represent the revealed word with underscores
-let revealedWord = Array(secretWord.length).fill('_');
-
-// Initialize the turn ID to 1
+const secretWord = wordPool[Math.floor(Math.random() * wordPool.length)];
+const revealedWord = Array(secretWord.length).fill('_');
 let turnId = 1;
 
-// Log the secret word to the console (for debugging purposes)
 console.log(secretWord);
 
-// Event listener for client connections
 io.on('connection', socket => {
-  console.log('CLIENT CONNECTED TO SERVER: ', socket.id);
+  console.log('CLIENT CONNECTED TO SERVER: '.green + socket.id.yellow);
+  console.log('Listening for PLAYER_JOIN event');
 
-  // Event handler for the 'PLAYER_JOIN' event
-  socket.on(eventPool.eventPool.PLAYER_JOIN, player => {
-    // Add the player to the queue and get the updated player object
-    let updatedPlayer = playerQueue.addPlayer(player);
+  socket.on(eventPool.PLAYER_JOIN, player => {
+    console.log('Received PLAYER_JOIN event:', player);
 
-    // Emit the updated player object to the joining player
-    io.to(socket.id).emit(eventPool.eventPool.UPDATE_PLAYER, updatedPlayer);
+    const updatedPlayer = playerQueue.addPlayer(player);
+    socket.emit(eventPool.UPDATE_PLAYER, updatedPlayer);
+    console.log('Sent UPDATE_PLAYER event:', updatedPlayer);
 
-    // Join the 'gameRoom' and log the player's name
     socket.join('gameRoom');
-    console.log(`${player.name} HAS JOINED THE GAME ROOM`);
+    console.log(`Player ${player.name} joined the game`);
 
-    // Emit the 'PLAYER_JOIN' event to the joining player
-    socket.emit(eventPool.eventPool.PLAYER_JOIN, player);
+    io.emit(eventPool.PLAYER_JOIN, playerQueue.players);
 
-    // Check the number of clients in the room
     const clientsInRoom = socket.adapter.rooms.get('gameRoom');
+
     if (clientsInRoom.size >= 2) {
-      // Prepare the payload for the game start event
-      let payload = {
+      const payload = {
         turnId: turnId,
         revealedWord: revealedWord,
       };
 
-      // Emit the 'GAME_START' event to all players in the room except the joining player
-      socket.to('gameRoom').emit(eventPool.eventPool.GAME_START, payload);
+      socket.to('gameRoom').emit(eventPool.GAME_START, payload);
     }
   });
 
-  // Event handler for the 'PLAYER_GUESS' event
-  socket.on(eventPool.eventPool.PLAYER_GUESS, guessLetter => {
+  socket.on(eventPool.PLAYER_LEAVE, playerId => {
+    console.log('Received PLAYER_LEAVE event:', playerId);
+
+    playerQueue.removePlayer(playerId);
+    console.log(`Player with id ${playerId} left the game`);
+
+    io.emit(eventPool.PLAYER_LEAVE, playerQueue.players);
+  });
+
+  // Handle the 'PLAYER_GUESS' event when a player makes a letter guess
+  socket.on(eventPool.PLAYER_GUESS, guessLetter => {
+    // Initialize the addedScore variable to keep track of the score increase
     let addedScore = 0;
 
     // Iterate over the secret word to check for matches with the guessed letter
     for (let idx = 0; idx < secretWord.length; idx++) {
-      if (guessLetter.toLowerCase() === secretWord[idx].toLowerCase()) {
-        // Update the revealed word and increase the player's score
+      if (
+        guessLetter.toLowerCase() === secretWord[idx].toLowerCase() &&
+        revealedWord[idx] === '_'
+      ) {
+        // If there is a match and the letter is not yet revealed, update the revealed word
         revealedWord[idx] = secretWord[idx];
-        playerQueue.players[turnId - 1].score++;
+
+        // Increase the score of the current player if it exists
+        if (playerQueue.players[turnId - 1]) {
+          playerQueue.players[turnId - 1].score++;
+        }
+
+        // Increase the addedScore count
         addedScore++;
       }
     }
 
     // Prepare the payload for the 'PLAYER_SCORE' event
-    let payload = {
+    const payload = {
       addedScore: addedScore,
       revealedWord: revealedWord,
     };
 
+    // If the addedScore is greater than 0, emit the 'PLAYER_SCORE' event to all sockets in the 'gameRoom'
     if (addedScore > 0) {
-      // Emit the 'PLAYER_SCORE' event to the guessing player if they earned points
-      socket.emit(eventPool.eventPool.PLAYER_SCORE, payload);
+      io.to('gameRoom').emit(eventPool.PLAYER_SCORE, payload);
     }
 
-    // Check if the guessed letter does not match any letters in the secret word
-    let noLetterMatch = !secretWord.some(
-      letter => letter.toLowerCase() === guessLetter.toLowerCase(),
-    );
+    // Check if the guessed letter does not match any letter in the secret word
+    const noLetterMatch = !secretWord
+      .toLowerCase()
+      .includes(guessLetter.toLowerCase());
 
+    // If there is no match, emit the 'PLAYER_GUESS' event to the current socket with a message
     if (noLetterMatch) {
-      // Emit a message to the guessing player if there was no match
       socket.emit(
-        eventPool.eventPool.PLAYER_GUESS,
-        chalk.red(`No ${guessLetter}'s!`) +
-          `\nWaiting for other player's turn...`,
+        eventPool.PLAYER_GUESS,
+        `No ${guessLetter}'s!`.red +
+          `\nWaiting for other player's turn...`.yellow,
       );
     }
 
-    // Check if the game is over (all letters have been revealed)
-    let isGameOver = revealedWord.every(letter => letter !== '_');
+    // Check if the game is over (all letters of the secret word are revealed)
+    const isGameOver = revealedWord.every(letter => letter !== '_');
 
+    // If the game is over, determine the winners and emit the 'PLAYER_GUESS' event to all sockets in the 'gameRoom'
     if (isGameOver) {
-      // Determine the highscore and the winners of the game
       let highscore = 0;
       let winners = [];
 
+      // Iterate over the players to find the highest score and the winners
       playerQueue.players.forEach(player => {
         if (player.score > highscore) {
           highscore = player.score;
@@ -128,40 +138,51 @@ io.on('connection', socket => {
         }
       });
 
-      // Create a comma-separated string of winner names
-      let winnerNames = winners.map(winner => winner.name).join(', ');
+      // Create a string of winner names separated by commas
+      const winnerNames = winners.map(winner => winner.name).join(', ');
 
-      // Emit the game over message to the guessing player
-      socket.emit(
-        eventPool.eventPool.PLAYER_GUESS,
-        `GAME OVER!! Winners are ${winnerNames} with ${highscore} points!`,
+      // Emit the game over message to all sockets in the 'gameRoom'
+      io.to('gameRoom').emit(
+        eventPool.PLAYER_GUESS,
+        `GAME OVER!! Winners are ${winnerNames} with ${highscore} points!`
+          .green,
       );
 
-      // Broadcast the game over message to all players in the room
-      socket
-        .to(`gameRoom`)
-        .emit(
-          eventPool.eventPool.PLAYER_GUESS,
-          `GAME OVER!! Winners are ${winnerNames} with ${highscore} points!`,
-        );
+      // Exit the function early since the game is over
       return;
     }
 
-    // Update the turn ID for the next player's turn
+    // Increment the turn ID for the next player's turn
     turnId++;
+
+    // If the turn ID exceeds the number of players, reset it to 1
     if (turnId > playerQueue.players.length) {
       turnId = 1;
     }
 
     // Prepare the payload for the 'PLAYER_TURN' event
-    payload = {
+    const previousPlayer =
+      playerQueue.players[turnId - 2] && playerQueue.players[turnId - 2].name
+        ? playerQueue.players[turnId - 2].name
+        : playerQueue.players[0] && playerQueue.players[0].name;
+
+    const playerTurnPayload = {
       revealedWord: revealedWord,
       guessLetter: guessLetter,
-      previousPlayer: playerQueue.players[turnId - 1].name,
+      previousPlayer: previousPlayer,
       turnId: turnId,
     };
 
-    // Emit the 'PLAYER_TURN' event to all players in the room except the guessing player
-    socket.to('gameRoom').emit(eventPool.eventPool.PLAYER_TURN, payload);
+    // Send the 'PLAYER_TURN' event to all sockets in the 'gameRoom' except the current socket
+    socket.to('gameRoom').emit(eventPool.PLAYER_TURN, playerTurnPayload);
+  });
+
+  // Handle the 'disconnect' event when a client disconnects from the server
+  socket.on('disconnect', () => {
+    // Print a message indicating that a client has disconnected, with the socket ID
+    console.log('CLIENT DISCONNECTED FROM SERVER: '.red + socket.id.yellow);
   });
 });
+
+// Print a message indicating that the server is running
+console.log('Server is running...');
