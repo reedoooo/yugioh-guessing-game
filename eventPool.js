@@ -12,8 +12,8 @@ const eventPool = {
   PLAYER_TURN: 'playerTurn',
   GAME_OVER: 'gameOver',
   PLAYER_LEAVE: 'playerLeave',
+  START_NEW_GAME: 'startNewGame',
 };
-
 
 module.exports = {
   eventPool,

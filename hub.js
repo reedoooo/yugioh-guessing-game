@@ -17,20 +17,20 @@ const io = new Server(parseInt(process.env.PORT), {
 const playerQueue = new PlayerQueue();
 
 const wordPool = [
-  'dark magician',
-  'blue eyes',
-  'buster blader',
+  'darkmagician',
+  'blueeyes',
+  'busterblader',
   'kuriboh',
   'exodia',
   'slifer',
   'obelisk',
   'ra',
-  'summoned skull',
-  'winged kuriboh',
+  'summonedskull',
+  'wingedkuriboh',
 ];
 
-const secretWord = wordPool[Math.floor(Math.random() * wordPool.length)];
-const revealedWord = Array(secretWord.length).fill('_');
+let secretWord = wordPool[Math.floor(Math.random() * wordPool.length)];
+let revealedWord = Array(secretWord.length).fill('_');
 let turnId = 1;
 
 console.log(secretWord);
@@ -42,9 +42,10 @@ io.on('connection', socket => {
   socket.on(eventPool.PLAYER_JOIN, player => {
     console.log('Received PLAYER_JOIN event:', player);
 
-    const updatedPlayer = playerQueue.addPlayer(player);
-    socket.emit(eventPool.UPDATE_PLAYER, updatedPlayer);
-    console.log('Sent UPDATE_PLAYER event:', updatedPlayer);
+    const updatedPlayer = { ...player, score: 0 }; // Initialize score property to 0
+    const addedPlayer = playerQueue.addPlayer(updatedPlayer);
+    socket.emit(eventPool.UPDATE_PLAYER, addedPlayer);
+    console.log('Sent UPDATE_PLAYER event:', addedPlayer);
 
     socket.join('gameRoom');
     console.log(`Player ${player.name} joined the game`);
@@ -89,6 +90,7 @@ io.on('connection', socket => {
         // Increase the score of the current player if it exists
         if (playerQueue.players[turnId - 1]) {
           playerQueue.players[turnId - 1].score++;
+          socket.emit(eventPool.UPDATE_PLAYER, playerQueue.players[turnId - 1]);
         }
 
         // Increase the addedScore count
@@ -124,12 +126,10 @@ io.on('connection', socket => {
     // Check if the game is over (all letters of the secret word are revealed)
     const isGameOver = revealedWord.every(letter => letter !== '_');
 
-    // If the game is over, determine the winners and emit the 'PLAYER_GUESS' event to all sockets in the 'gameRoom'
     if (isGameOver) {
       let highscore = 0;
       let winners = [];
 
-      // Iterate over the players to find the highest score and the winners
       playerQueue.players.forEach(player => {
         if (player.score > highscore) {
           highscore = player.score;
@@ -139,17 +139,23 @@ io.on('connection', socket => {
         }
       });
 
-      // Create a string of winner names separated by commas
       const winnerNames = winners.map(winner => winner.name).join(', ');
 
-      // Emit the game over message to all sockets in the 'gameRoom'
       io.to('gameRoom').emit(
         eventPool.PLAYER_GUESS,
         `GAME OVER!! Winners are ${winnerNames} with ${highscore} points!`
           .green,
       );
 
-      // Exit the function early since the game is over
+      // Emit GAME_OVER event
+      const gameOverPayload = {
+        winners: winnerNames,
+        highscore: highscore,
+      };
+
+      console.log('Emitting GAME_OVER event');
+      io.to('gameRoom').emit(eventPool.GAME_OVER, gameOverPayload);
+
       return;
     }
 
@@ -159,6 +165,13 @@ io.on('connection', socket => {
     // If the turn ID exceeds the number of players, reset it to 1
     if (turnId > playerQueue.players.length) {
       turnId = 1;
+    }
+
+    // Log whose turn it is
+    if (playerQueue.players[turnId - 1]) {
+      console.log(`Now it's ${playerQueue.players[turnId - 1].name}'s turn`);
+    } else {
+      console.log("Player's turn not available");
     }
 
     // Prepare the payload for the 'PLAYER_TURN' event
@@ -176,6 +189,36 @@ io.on('connection', socket => {
 
     // Send the 'PLAYER_TURN' event to all sockets in the 'gameRoom' except the current socket
     socket.to('gameRoom').emit(eventPool.PLAYER_TURN, playerTurnPayload);
+  });
+
+  socket.on(eventPool.START_NEW_GAME, () => {
+    console.log('Received START_NEW_GAME event');
+
+    // Generate a new secret word
+    const newSecretWord = wordPool[Math.floor(Math.random() * wordPool.length)];
+
+    // Update the secretWord variable
+    secretWord = newSecretWord;
+
+    // Reset game state
+    revealedWord.length = secretWord.length;
+    revealedWord.fill('_');
+    turnId = 1;
+
+    // Clear scores of all players
+    playerQueue.players.forEach(player => {
+      player.score = 0;
+      socket.emit(eventPool.UPDATE_PLAYER, player);
+    });
+
+    // Emit event to start a new game
+    const payload = {
+      turnId: turnId,
+      revealedWord: revealedWord,
+    };
+    console.log('newSecretWord: ', newSecretWord);
+
+    io.to('gameRoom').emit(eventPool.GAME_START, payload);
   });
 
   // Handle the 'disconnect' event when a client disconnects from the server
