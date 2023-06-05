@@ -126,14 +126,11 @@ io.on('connection', socket => {
     // Check if the game is over (all letters of the secret word are revealed)
     const isGameOver = revealedWord.every(letter => letter !== '_');
 
-    // If the game is over, determine the winners and emit the 'PLAYER_GUESS' event to all sockets in the 'gameRoom'
     if (isGameOver) {
       let highscore = 0;
       let winners = [];
 
-      // Iterate over the players to find the highest score and the winners
       playerQueue.players.forEach(player => {
-        console.log(player.score, highscore);
         if (player.score > highscore) {
           highscore = player.score;
           winners = [player];
@@ -142,17 +139,23 @@ io.on('connection', socket => {
         }
       });
 
-      // Create a string of winner names separated by commas
       const winnerNames = winners.map(winner => winner.name).join(', ');
 
-      // Emit the game over message to all sockets in the 'gameRoom'
       io.to('gameRoom').emit(
         eventPool.PLAYER_GUESS,
         `GAME OVER!! Winners are ${winnerNames} with ${highscore} points!`
           .green,
       );
 
-      // Exit the function early since the game is over
+      // Emit GAME_OVER event
+      const gameOverPayload = {
+        winners: winnerNames,
+        highscore: highscore,
+      };
+
+      console.log('Emitting GAME_OVER event');
+      io.to('gameRoom').emit(eventPool.GAME_OVER, gameOverPayload);
+
       return;
     }
 
@@ -168,7 +171,7 @@ io.on('connection', socket => {
     if (playerQueue.players[turnId - 1]) {
       console.log(`Now it's ${playerQueue.players[turnId - 1].name}'s turn`);
     } else {
-      console.log('Player\'s turn not available');
+      console.log("Player's turn not available");
     }
 
     // Prepare the payload for the 'PLAYER_TURN' event
