@@ -3,16 +3,16 @@
 require('dotenv').config();
 const colors = require('colors');
 
-// const { Server } = require('socket.io');
+const { Server } = require('socket.io');
 const PlayerQueue = require('./lib/playerqueue');
 const { eventPool } = require('./eventPool');
 
-// const io = new Server(parseInt(process.env.PORT), {
-//   cors: {
-//     origin: '*',
-//     methods: ['GET', 'POST'],
-//   },
-// });
+const io = new Server(parseInt(process.env.PORT), {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+  },
+});
 
 const playerQueue = new PlayerQueue();
 
